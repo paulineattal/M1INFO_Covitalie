@@ -1,19 +1,10 @@
-# -*- coding: utf-8 -*-
-"""
-Spyder Editor
-
-This is a temporary script file.
-"""
 
 #import des librairies utiles a l'application
 import pandas as pd
-import numpy as np
-from color import colors_site, colors_monuments,colors,colors_avant_pendant,colors_et_ou, colors_monuments_rome, colors_monuments_venise
+from .color import colors_site, colors_monuments,colors,colors_avant_pendant, colors_monuments_rome, colors_monuments_venise
 import plotly.express as px
 import plotly 
-import random 
 import plotly.graph_objs as go 
-from collections import deque 
 import json
 from flask import Flask,render_template
 import psycopg2
@@ -61,52 +52,19 @@ def graphd():
     
     #connection a la base de donnees
     #recuperations des donnees utiles a l'affichage des graphiques d ela page
-    try:
-        conn = psycopg2.connect(
-              user = "m101",
-              password = "1999",
-              host = "db-etu.univ-lyon2.fr",
-              port = "5432",
-              database = "m101"
-        )
-        cur = conn.cursor()
-        sql = "SELECT * FROM Nb_visites_tot_monuments"
-        
-        cur5 = conn.cursor()
-        sql5 = "select * from liens_Venise_Rome"
-
-        cur.execute(sql)
-        res = cur.fetchall()
-        cur5.execute(sql5)
-        res5 = cur5.fetchall() 
-        
-        
-        cur5.close()
-        cur.close()
-        conn.close()
-    except (Exception, psycopg2.Error) as error :
-        print ("Erreur lors de la connexion à PostgreSQL", error)
-
-
-    #graphique nb_vis_site
-    valeurs1 = []
-    for i in range(0,6,3):
-        valeurs1.append(int(res[i][1])+int(res[i+1][1])+int(res[i+2][1]))
+    data_nb_vis_site = pd.read_csv("../coviitalie/covitalieapp/csv/Nb_visites_tot-sites.csv", sep=";").rename(columns={"Unnamed: 0" : "Sites", "Site":"val"})
+    values = pd.read_csv("../coviitalie/covitalieapp/csv/liens_Venise_Rome.csv", sep=";").drop(columns = "Unnamed: 0").rename(columns={"0" : "val"})
+    data_nb_vis_monu = pd.read_csv("../coviitalie/covitalieapp/csv/Nb_visites_tot-monuments.csv", sep=";").rename(columns={"Unnamed: 0" : "Monu", "Label":"val"})
     
-    #regrouper les donnees dans un dataframe pour la construction de la figure 
-    data_nb_vis_site = pd.DataFrame({
-            "Nombre de visites": valeurs1,
-            "Sites": ["Rome", "Venise"]
-    })
     
     #construction de la figure
     fig_nb_vis_site = px.bar(data_nb_vis_site, 
             x="Sites", 
-            y="Nombre de visites", 
-            text="Nombre de visites", 
+            y="val", 
+            text="Sites", 
             color="Sites",
             color_discrete_map=colors_site
-    ) 
+    )
 
     #modification de l'affichage de la figure
     fig_nb_vis_site.update_traces(texttemplate='%{text:.2s}', textposition='outside')
@@ -123,26 +81,20 @@ def graphd():
     description_nb_vis_site = "Ce graphique présente le nombre de touristes ayant visité Rome ou Venise."
     interpretation_nb_vis_site = "On remarque sur ce graphique que les touristes qui visitent le site de Rome sont 3 fois plus nombreux que ceux qui visitent  celui de Venise."
     
-    #graphique nb_vis_monu
-    valeurs2 = []
-    monuments2 = []
-    for row in res:
-        valeurs2.append(int(row[1]))
-        monuments2.append(row[0])
     
+
+    
+
     #regrouper les donnees dans un dataframe pour la construction de la figure 
-    data_nb_vis_monu = pd.DataFrame({
-            "Monuments": ["Fontaine de Trévi", "Colisée", "Panthéon", "Place Saint-Marc", "Pont du Rialto", "Palais des Doges"],
-            "Nombre de visites": valeurs2,
-            "Sites": ["Rome", "Rome", "Rome", "Venise", "Venise", "Venise"]
-    })
+    data_nb_vis_monu = data_nb_vis_monu.assign(Sites=["Rome", "Rome", "Rome", "Venise", "Venise", "Venise"])
+    
     
     #construction de la figure
     fig_nb_vis_monu = px.bar(data_nb_vis_monu, 
             x="Sites", 
-            y="Nombre de visites", 
-            text="Nombre de visites",
-            color="Monuments", 
+            y="val", 
+            text="Sites",
+            color="Monu",
             barmode="group", 
             color_discrete_map=colors_monuments
     )
@@ -161,13 +113,9 @@ def graphd():
     titre_nb_vis_monu = "Flux touristique par monument"
     description_nb_vis_monu = "Ce graphique présente le nombre de touristes ayant visité les monuments de Rome et de Venise (le Colisée, le Panthéon, la Fontaine de Trevi) et Venise (le palais des Doges, le Pont du Rialto et la place Saint-Marc)."
     interpretation_nb_vis_monu ="On constate que la Fontaine de Trevi est le monument le plus visité, s'ensuit le Colisée puis le Panthéon ce qui est normal car étant des monuments du site de Rome. Quant aux monuments de Venise, ils sont les moins visités."
-    
-    
-    
-    #graphique lien_venise_rome
-    values = []
-    for row in res5:
-        values.append(int(row[1]))
+
+
+
         
     labels = ["Personnes ayant visité Rome et Venise au cours du même voyage" ,
               "Personnes n'ayant pas visité Rome et Venise au cours du même voyage"]
@@ -185,18 +133,16 @@ def graphd():
             textinfo='percent', 
             textfont_size=20,
             marker=dict(colors=colors_pie))
-
+    
     #definition des variables de retour de la fonction
     graphJSON_lien_venise_rome = json.dumps(fig_lien_venise_rome, cls=plotly.utils.PlotlyJSONEncoder)
     titre_lien_venise_rome = "Lien entre Venise et Rome"
     description_lien_venise_rome= "Ce graphique présente le pourcentage des touristes ayant visité rome et venise et ceux ayant visité Rome ou Venise."
     interpretation_lien_venise_rome ="On remarque sur ce graphique que les touristes visitent en majorité soit Rome soit Venise, ce qui est le cas pour 98 pourcent des visiteurs, très peu de touristes visitent à la fois Rome et Venise, c'est le cas pour 2 pourcent des personnes. On peut donc dire qu'il n'y a pas vraiment de lien entre Rome et Venise."
     
-    
-    
-    
+
     description = "Cette page nous présente des graphiques qui nous montrent le flux touristique par site touristique et par monument de 2017 à 2021."
-    
+
     #retour de la fonction
     return render_template('graphed.html',
             description_page_description = description,
@@ -964,6 +910,4 @@ def testC(year_slctd):
     
     return (fs,fmr,fmv)
 
-#lancement de l'instance Flask
-if __name__ == "__main__":
-    app.run(debug=True)
+
